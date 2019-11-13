@@ -17,6 +17,7 @@ const SCREEN_SIZE: (f32, f32) = (
 struct World {
     spritebatch: graphics::spritebatch::SpriteBatch,
     tiles: [u8; (GRID_SIZE.0 * GRID_SIZE.1) as usize],
+    selected: Vector2<i32>,
 }
 
 impl World {
@@ -26,6 +27,7 @@ impl World {
         let w = World {
             spritebatch,
             tiles: [0; (GRID_SIZE.0 * GRID_SIZE.1) as usize],
+            selected: Vector2::new(0, 0),
         };
         Ok(w)
     }
@@ -46,48 +48,7 @@ impl EventHandler for World {
         _x: f32,
         _y: f32,
     ) {
-        let mouse = ggez::input::mouse::position(ctx);
-        let cell = Point2::new(
-            mouse.x as i32 / GRID_CELL_SIZE.0,
-            mouse.y as i32 / GRID_CELL_SIZE.1,
-        );
-        let offset = Point2::new(
-            mouse.x as i32 % GRID_CELL_SIZE.0,
-            mouse.y as i32 % GRID_CELL_SIZE.1,
-        );
-
-        let img = graphics::Image::new(ctx, "/isometric_demo.png").unwrap();
-        let img_to_rgba = img.to_rgba8(ctx).unwrap();
-
-        let offset_y = 4 * offset.y * img.width() as i32;
-        let red = img_to_rgba[offset_y as usize + 0 + ((3 * 40 * 4) + (4 * offset.x)) as usize];
-        let green = img_to_rgba[offset_y as usize + 1 + ((3 * 40 * 4) + (4 * offset.x)) as usize];
-        let blue = img_to_rgba[offset_y as usize + 2 + ((3 * 40 * 4) + (4 * offset.x)) as usize];
-        let color = graphics::Color::from_rgb(red, green, blue);
-
-        let RED: Color = Color::from_rgb(255, 0, 0);
-        let GREEN: Color = Color::from_rgb(0, 255, 0);
-        let BLUE: Color = Color::from_rgb(0, 0, 255);
-        let YELLOW: Color = Color::from_rgb(255, 255, 0);
-
-        let mut selected = Vector2::new(
-            (cell.y - ORIGIN.1) + (cell.x - ORIGIN.0),
-            (cell.y - ORIGIN.1) - (cell.x - ORIGIN.0),
-        );
-
-        if color == RED {
-            selected += Vector2::new(-1, 0);
-        }
-        if color == GREEN {
-            selected += Vector2::new(0, 1);
-        }
-        if color == BLUE {
-            selected += Vector2::new(0, -1);
-        }
-        if color == YELLOW {
-            selected += Vector2::new(1, 0);
-        }
-
+        let selected = self.selected;
         self.tiles[(selected.y * GRID_SIZE.0 + selected.x) as usize] += 1;
         self.tiles[(selected.y * GRID_SIZE.0 + selected.x) as usize] %= 6;
     }
@@ -139,95 +100,71 @@ impl EventHandler for World {
         if color == YELLOW {
             selected += Vector2::new(1, 0);
         }
+        self.selected = selected;
 
         for y in 0..GRID_SIZE.1 {
             for x in 0..GRID_SIZE.0 {
                 let vector_world = to_screen(x, y);
-                match self.tiles[(y * GRID_SIZE.0 + x) as usize] {
-                    0 => {
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.25, 0.0, 0.25, 0.35))
-                            .dest(Point2::new(
-                                (vector_world.x) as f32,
-                                (vector_world.y) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
-
-                        self.spritebatch.add(p);
-                    }
+                let (rect, dest) = match self.tiles[(y * GRID_SIZE.0 + x) as usize] {
+                    0 => (
+                        graphics::Rect::new(0.25, 0.0, 0.25, 0.35),
+                        Point2::new((vector_world.x) as f32, (vector_world.y) as f32),
+                    ),
                     1 => {
                         // visible tile
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.5, 0.0, 0.25, 1.0 / 3.0))
-                            .dest(Point2::new(
-                                (vector_world.x) as f32,
-                                (vector_world.y) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
 
-                        self.spritebatch.add(p);
+                        (
+                            graphics::Rect::new(0.5, 0.0, 0.25, 1.0 / 3.0),
+                            Point2::new((vector_world.x) as f32, (vector_world.y) as f32),
+                        )
                     }
                     2 => {
                         // tree
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.0, 1.0 / 3.0, 0.25, 2.0 / 3.0))
-                            .dest(Point2::new(
+                        (
+                            graphics::Rect::new(0.0, 1.0 / 3.0, 0.25, 2.0 / 3.0),
+                            Point2::new(
                                 (vector_world.x) as f32,
                                 (vector_world.y - GRID_CELL_SIZE.1) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
-
-                        self.spritebatch.add(p);
+                            ),
+                        )
                     }
                     3 => {
                         // spooky tree
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.25, 1.0 / 3.0, 0.25, 2.0 / 3.0))
-                            .dest(Point2::new(
+
+                        (
+                            graphics::Rect::new(0.25, 1.0 / 3.0, 0.25, 2.0 / 3.0),
+                            Point2::new(
                                 (vector_world.x) as f32,
                                 (vector_world.y - GRID_CELL_SIZE.1) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
-
-                        self.spritebatch.add(p);
+                            ),
+                        )
                     }
                     4 => {
                         // beach
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.5, 2.0 / 3.0, 0.25, 1.0 / 3.0))
-                            .dest(Point2::new(
-                                (vector_world.x) as f32,
-                                (vector_world.y) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
 
-                        self.spritebatch.add(p);
+                        (
+                            graphics::Rect::new(0.5, 2.0 / 3.0, 0.25, 1.0 / 3.0),
+                            Point2::new((vector_world.x) as f32, (vector_world.y) as f32),
+                        )
                     }
                     5 => {
                         // water
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(3.0 / 4.0, 2.0 / 3.0, 0.25, 1.0 / 3.0))
-                            .dest(Point2::new(
-                                (vector_world.x) as f32,
-                                (vector_world.y) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
 
-                        self.spritebatch.add(p);
+                        (
+                            graphics::Rect::new(3.0 / 4.0, 2.0 / 3.0, 0.25, 1.0 / 3.0),
+                            Point2::new((vector_world.x) as f32, (vector_world.y) as f32),
+                        )
                     }
                     _ => {
                         // invisible tile
-                        let p = graphics::DrawParam::new()
-                            .src(graphics::Rect::new(0.25, 0.0, 0.25, 0.35))
-                            .dest(Point2::new(
-                                (vector_world.x) as f32,
-                                (vector_world.y) as f32,
-                            ));
-                        // .scale(Vector2::new(2.0, 2.0));
-
-                        self.spritebatch.add(p);
+                        (
+                            graphics::Rect::new(0.25, 0.0, 0.25, 0.35),
+                            Point2::new((vector_world.x) as f32, (vector_world.y) as f32),
+                        )
                     }
-                }
+                };
+                let p = graphics::DrawParam::new().src(rect).dest(dest);
+                self.spritebatch.add(p);
             }
         }
 
@@ -243,19 +180,6 @@ impl EventHandler for World {
 
         graphics::draw(ctx, &self.spritebatch, graphics::DrawParam::new())?;
         self.spritebatch.clear();
-
-        // let rectangle = graphics::Mesh::new_rectangle(
-        //     ctx,
-        //     graphics::DrawMode::stroke(2.0),
-        //     graphics::Rect::new(
-        //         (cell.x * GRID_CELL_SIZE.0) as f32,
-        //         (cell.y * GRID_CELL_SIZE.1) as f32,
-        //         (GRID_CELL_SIZE.0) as f32,
-        //         (GRID_CELL_SIZE.1) as f32,
-        //     ),
-        //     [0.0, 0.3, 0.3, 1.0].into(),
-        // )?;
-        // graphics::draw(ctx, &rectangle, (ggez::mint::Point2 { x: 0.0, y: 0.0 },))?;
 
         let text = graphics::Text::new(
             graphics::TextFragment::new(format!("Mouse: {},{}", mouse.x as i32, mouse.y as i32))
